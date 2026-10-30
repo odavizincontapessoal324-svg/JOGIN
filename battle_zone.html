@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Battle Zone - Lobby</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; }
+  body { background: #00a8ff; color: white; height: 100vh; overflow: hidden; }
+
+  #loading {
+    position: fixed; inset: 0;
+    background: #000 url('PRIMEIRATELADECARREGAMENTO.jfif') center/cover no-repeat;
+    display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
+    z-index: 1000; padding-bottom: 80px;
+  }
+  #loading h1 { font-size: 48px; color: #ffd700; text-shadow: 0 4px 0 #b8860b, 0 0 20px #000; margin-bottom: 20px; }
+  .bar { width: 340px; height: 24px; background: rgba(0,0,0,0.6); border-radius: 12px; overflow: hidden; border: 3px solid #ffd700; }
+  .bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #ffd700, #ffaa00); transition: width 0.15s; }
+
+  #lobby { display: none; width: 100%; height: 100%; position: relative; }
+  #lobby.active { display: block; }
+
+  .top-bar {
+    position: absolute; top: 0; left: 0; right: 0; height: 80px;
+    background: linear-gradient(180deg, #1a3a6e, #0d2447);
+    display: flex; justify-content: space-between; align-items: center; padding: 0 20px;
+    border-bottom: 5px solid #ffd700; z-index: 10;
+  }
+  .profile { display: flex; align-items: center; gap: 12px; }
+  .avatar { width: 55px; height: 55px; border-radius: 12px; background: #4facfe; border: 3px solid #ffd700; display: flex; align-items: center; justify-content: center; font-size: 28px; }
+  .name { font-weight: bold; font-size: 20px; }
+  .trophies { background: #ffd700; color: #000; padding: 4px 10px; border-radius: 20px; font-weight: bold; }
+  .currencies { display: flex; gap: 15px; }
+  .currency { background: #0d2447; padding: 8px 14px; border-radius: 20px; border: 2px solid #ffd700; font-weight: bold; }
+
+  .side-buttons { position: absolute; top: 110px; display: flex; flex-direction: column; gap: 12px; z-index: 5; }
+  .left { left: 15px; }
+  .right { right: 15px; }
+  .side-btn {
+    width: 90px; height: 90px; border-radius: 18px;
+    background: linear-gradient(180deg, #2a5caa, #1a3a6e);
+    border: 3px solid #ffd700; color: white; font-weight: bold; font-size: 14px;
+    cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    box-shadow: 0 5px 0 #0d2447; line-height: 1.2;
+  }
+  .side-btn:hover { transform: scale(1.06); }
+
+  .character { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -45%); width: 280px; height: 380px; display: flex; align-items: flex-end; justify-content: center; }
+  .character img { max-height: 100%; filter: drop-shadow(0 10px 10px rgba(0,0,0,0.4)); }
+
+  .bottom-bar {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 110px;
+    display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
+    background: linear-gradient(0deg, #0d2447, transparent);
+  }
+  .bottom-left { display: flex; gap: 12px; }
+  .brawl-pass, .missions-btn {
+    background: linear-gradient(180deg, #ffd700, #ffaa00); color: #000; padding: 12px 18px;
+    border-radius: 16px; font-weight: bold; border: 3px solid #fff; cursor: pointer; min-width: 140px; text-align: center;
+  }
+  .missions-btn { background: linear-gradient(180deg, #4facfe, #2a7de1); color: white; }
+  .mode-selector { background: #1a3a6e; border: 4px solid #fff; border-radius: 16px; padding: 10px 25px; font-weight: bold; font-size: 18px; }
+  .play-btn {
+    background: linear-gradient(180deg, #ffd700, #ffaa00); color: #000; border: 4px solid #fff; border-radius: 16px;
+    padding: 18px 50px; font-size: 28px; font-weight: 900; cursor: pointer; box-shadow: 0 6px 0 #cc8800;
+  }
+  .play-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #cc8800; }
+
+  .panel {
+    display: none; position: absolute; inset: 90px 20px 120px 20px;
+    background: rgba(13, 36, 71, 0.95); border-radius: 20px;
+    border: 4px solid #ffd700; padding: 25px; overflow: auto; z-index: 20;
+  }
+  .panel.active { display: block; }
+  .close-btn { position: absolute; top: 15px; right: 15px; background: #ff4757; color: white; border: none; width: 40px; height: 40px; border-radius: 50%; font-size: 20px; cursor: pointer; }
+
+  .shop-layout { display: flex; height: 100%; }
+  .shop-tabs {
+    width: 160px; background: #0d2447; border-radius: 12px; padding: 15px 10px;
+    display: flex; flex-direction: column; gap: 12px; margin-right: 20px;
+  }
+  .shop-tab {
+    padding: 14px 10px; background: #1a3a6e; border: 2px solid #4facfe;
+    border-radius: 10px; color: white; font-weight: bold; cursor: pointer; text-align: center;
+  }
+  .shop-tab.active { background: #ffd700; color: #000; border-color: #fff; }
+  .shop-content { flex: 1; }
+
+  .brawler-grid { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 10px; }
+  .brawler-card, .pack-card, .mission-card {
+    background: #1a3a6e; border-radius: 16px; padding: 15px; width: 200px; text-align: center;
+    border: 3px solid #4facfe;
+  }
+  .brawler-card.locked { opacity: 0.45; filter: grayscale(0.8); border-color: #555; }
+  .brawler-card img { width: 120px; height: 120px; object-fit: contain; background: #0a2040; border-radius: 12px; }
+  .btn {
+    background: #22c55e; color: white; border: none; padding: 10px; border-radius: 10px;
+    font-weight: bold; cursor: pointer; width: 100%; margin-top: 8px;
+  }
+  .btn:disabled { background: #555; cursor: not-allowed; }
+  .btn-claim { background: #ffd700; color: #000; }
+  .discount { color: #22c55e; font-weight: bold; font-size: 14px; }
+  .mission-card.completed { border-color: #22c55e; }
+
+  #game-canvas { display: none; margin: 20px auto; border: 4px solid #ffd700; border-radius: 12px; }
+  #game-canvas.active { display: block; }
+
+  #back-btn {
+    display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, 100px);
+    background: linear-gradient(180deg, #ffd700, #ffaa00); color: #000; border: 4px solid #fff;
+    border-radius: 16px; padding: 16px 40px; font-size: 22px; font-weight: 900; cursor: pointer;
+    box-shadow: 0 6px 0 #cc8800; z-index: 999;
+  }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <h1>BATTLE ZONE</h1>
+  <div class="bar"><div class="bar-fill" id="bar"></div></div>
+  <p id="load-text">Carregando...</p>
+</div>
+
+<div id="lobby">
+  <div class="top-bar">
+    <div class="profile">
+      <div class="avatar">🎮</div>
+      <div>
+        <div class="name">Interlacedgame</div>
+        <div class="trophies">🏆 <span id="trophies">45</span></div>
+      </div>
+    </div>
+    <div class="currencies">
+      <div class="currency">💎 <span id="gems">168</span></div>
+      <div class="currency">🪙 <span id="coins">0</span></div>
+    </div>
+  </div>
+
+  <div class="side-buttons left">
+    <button class="side-btn" onclick="openPanel('shop')">🛒<br>Loja</button>
+    <button class="side-btn" onclick="openPanel('brawlers')">👥<br>Brawlers</button>
+    <button class="side-btn">📰<br>News</button>
+  </div>
+
+  <div class="side-buttons right">
+    <button class="side-btn">👫<br>Amigos</button>
+    <button class="side-btn">🏰<br>Club</button>
+    <button class="side-btn">💬<br>Chat</button>
+  </div>
+
+  <div class="character">
+    <img src="https://via.placeholder.com/280x380/00a8ff/ffffff?text=Brawler" alt="Brawler">
+  </div>
+
+  <div class="bottom-bar">
+    <div class="bottom-left">
+      <div class="brawl-pass" onclick="openPanel('brawlpass')">BRAWL PASS<br>53/100</div>
+      <div class="missions-btn" onclick="openPanel('missions')">MISSÕES</div>
+    </div>
+    <div class="mode-selector">💀 SOLO SHOWDOWN</div>
+    <button class="play-btn" onclick="startGame()">PLAY</button>
+  </div>
+
+  <!-- Loja -->
+  <div id="shop-panel" class="panel">
+    <button class="close-btn" onclick="closePanels()">✕</button>
+    <div class="shop-layout">
+      <div class="shop-tabs">
+        <div class="shop-tab active" onclick="showShopTab('brawlers', this)">Brawlers</div>
+        <div class="shop-tab" onclick="showShopTab('resources', this)">Pacotes de Recursos</div>
+      </div>
+      <div class="shop-content">
+        <div id="shop-brawlers">
+          <h2 style="color:#ffd700; margin-bottom:15px;">Brawlers</h2>
+          <div class="brawler-grid">
+            <div class="brawler-card">
+              <img src="KEVIN-ABAZUKAS.png" alt="Kevin">
+              <h3>Kevin</h3>
+              <div style="color:#ffd700;">⭐ 80</div>
+              <button class="btn" onclick="unlockBrawler('kevin', this)">Comprar</button>
+            </div>
+            <div class="brawler-card">
+              <img src="BRUWL-ABAZUKAS.png" alt="Bruwly">
+              <h3>Bruwly</h3>
+              <div style="color:#ffd700;">⭐ 120</div>
+              <button class="btn" onclick="unlockBrawler('bruwly', this)">Comprar</button>
+            </div>
+            <div class="brawler-card">
+              <img src="WARMIN-ABAZUKAS.png" alt="Warmin">
+              <h3>Warmin</h3>
+              <div style="color:#ffd700;">⭐ 100</div>
+              <button class="btn" onclick="unlockBrawler('warmin', this)">Comprar</button>
+            </div>
+          </div>
+        </div>
+        <div id="shop-resources" style="display:none;">
+          <h2 style="color:#ffd700; margin-bottom:15px;">Pacotes de Recursos</h2>
+          <div class="brawler-grid">
+            <div class="pack-card">
+              <div style="font-size:40px;">💎</div>
+              <h3>50 Gemas</h3>
+              <div class="discount">20% OFF</div>
+              <div style="color:#aaa; text-decoration:line-through;">🪙 500</div>
+              <div style="color:#ffd700; font-weight:bold;">🪙 400</div>
+              <button class="btn" onclick="buyPack(400, 50, 0, 0)">Comprar</button>
+            </div>
+            <div class="pack-card">
+              <div style="font-size:40px;">💎</div>
+              <h3>120 Gemas</h3>
+              <div class="discount">30% OFF</div>
+              <div style="color:#aaa; text-decoration:line-through;">🪙 1200</div>
+              <div style="color:#ffd700; font-weight:bold;">🪙 840</div>
+              <button class="btn" onclick="buyPack(840, 120, 0, 0)">Comprar</button>
+            </div>
+            <div class="pack-card">
+              <div style="font-size:40px;">🪙</div>
+              <h3>300 Moedas</h3>
+              <div class="discount">15% OFF</div>
+              <div style="color:#aaa; text-decoration:line-through;">💎 40</div>
+              <div style="color:#ffd700; font-weight:bold;">💎 34</div>
+              <button class="btn" onclick="buyPack(0, 0, 300, 34)">Comprar</button>
+            </div>
+            <div class="pack-card">
+              <div style="font-size:40px;">🪙</div>
+              <h3>800 Moedas</h3>
+              <div class="discount">25% OFF</div>
+              <div style="color:#aaa; text-decoration:line-through;">💎 100</div>
+              <div style="color:#ffd700; font-weight:bold;">💎 75</div>
+              <button class="btn" onclick="buyPack(0, 0, 800, 75)">Comprar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Missões -->
+  <div id="missions-panel" class="panel">
+    <button class="close-btn" onclick="closePanels()">✕</button>
+    <h2 style="color:#4facfe;">Missões</h2>
+    <div class="brawler-grid" id="missions-list" style="margin-top:20px;"></div>
+  </div>
+
+  <div id="brawlers-panel" class="panel">
+    <button class="close-btn" onclick="closePanels()">✕</button>
+    <h2 style="color:#4facfe;">Seus Brawlers</h2>
+    <div class="brawler-grid" id="brawler-list">
+      <div class="brawler-card locked" id="card-kevin">
+        <img id="img-kevin" src="https://via.placeholder.com/120/555/ffffff?text=???" alt="Kevin">
+        <h4>Kevin</h4>
+        <div id="status-kevin" style="color:#aaa;">Bloqueado</div>
+      </div>
+      <div class="brawler-card locked" id="card-bruwly">
+        <img id="img-bruwly" src="https://via.placeholder.com/120/555/ffffff?text=???" alt="Bruwly">
+        <h4>Bruwly</h4>
+        <div id="status-bruwly" style="color:#aaa;">Bloqueado</div>
+      </div>
+      <div class="brawler-card locked" id="card-warmin">
+        <img id="img-warmin" src="https://via.placeholder.com/120/555/ffffff?text=???" alt="Warmin">
+        <h4>Warmin</h4>
+        <div id="status-warmin" style="color:#aaa;">Bloqueado</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<canvas id="game-canvas" width="800" height="600"></canvas>
+<button id="back-btn" onclick="backToLobby()">VOLTAR</button>
+
+<script>
+let gems = 168, coins = 0, trophies = 45;
+let totalKills = 0, totalScore = 0, brawlersBought = 0;
+
+const missions = [
+  { id: 'hunter', name: 'Caçador', level: 1, target: 10, progress: 0, reward: 20, type: 'kills', desc: 'Elimine inimigos', claimable: false },
+  { id: 'survivor', name: 'Sobrevivente', level: 1, target: 100, progress: 0, reward: 30, type: 'score', desc: 'Alcance pontos', claimable: false },
+  { id: 'collector', name: 'Colecionador', level: 1, target: 1, progress: 0, reward: 15, type: 'buy', desc: 'Compre brawlers', claimable: false }
+];
+
+function updateMissionsUI() {
+  const list = document.getElementById('missions-list');
+  list.innerHTML = '';
+  missions.forEach((m, index) => {
+    const roman = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][m.level] || m.level;
+    const card = document.createElement('div');
+    card.className = 'mission-card' + (m.claimable ? ' completed' : '');
+    card.innerHTML = `
+      <h3>${m.name} ${roman}</h3>
+      <p>${m.desc}</p>
+      <div style="color:#ffd700; margin:10px 0;">Math.min(m.progress,m.target)/{m.target}</div>
+      <div>Recompensa: ${m.reward} ${m.type === 'buy' ? '💎' : '🏆'}</div>
+      ${m.claimable ? `<button class="btn btn-claim" onclick="claimMission(${index})">Resgatar</button>` : ''}
+    `;
+    list.appendChild(card);
+  });
+}
+
+function updateMissionProgress() {
+  missions.forEach(m => {
+    if (m.type === 'kills') m.progress = totalKills;
+    if (m.type === 'score') m.progress = totalScore;
+    if (m.type === 'buy') m.progress = brawlersBought;
+
+    if (m.progress >= m.target && !m.claimable) {
+      m.claimable = true;
+    }
+  });
+  updateMissionsUI();
+}
+
+function claimMission(index) {
+  const m = missions[index];
+  if (!m.claimable) return;
+
+  if (m.type === 'buy') gems += m.reward;
+  else trophies += m.reward;
+
+  document.getElementById('gems').textContent = gems;
+  document.getElementById('trophies').textContent = trophies;
+
+  alert(`Missão ${m.name} ['','I','II','III','IV','V','VI'][m.level]||m.levelresgatada!+{m.reward}`);
+
+  // Avança para o próximo nível
+  m.level++;
+  m.target = Math.floor(m.target * 1.8);
+  m.reward = Math.floor(m.reward * 1.4);
+  m.claimable = false;
+
+  // Recalcula progresso em relação à nova meta
+  updateMissionProgress();
+}
+
+let progress = 0;
+const bar = document.getElementById('bar');
+const loadText = document.getElementById('load-text');
+const texts = ['Carregando mapas...', 'Preparando brawlers...', 'Carregando loja...', 'Pronto!'];
+
+const loadInterval = setInterval(() => {
+  progress += 1.4;
+  bar.style.width = Math.min(progress, 100) + '%';
+  if (progress >= 100) {
+    clearInterval(loadInterval);
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('lobby').classList.add('active');
+    updateMissionsUI();
+  } else {
+    const idx = Math.floor(progress / 25);
+    if (texts[idx]) loadText.textContent = texts[idx];
+  }
+}, 28);
+
+function openPanel(name) {
+  closePanels();
+  if (name === 'missions') updateMissionsUI();
+  document.getElementById(name + '-panel').classList.add('active');
+}
+function closePanels() {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+}
+
+function showShopTab(tab, btn) {
+  document.querySelectorAll('.shop-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('shop-brawlers').style.display = tab === 'brawlers' ? 'block' : 'none';
+  document.getElementById('shop-resources').style.display = tab === 'resources' ? 'block' : 'none';
+}
+
+function buyPack(coinCost, gemGain, coinGain, gemCost) {
+  if (coinCost > 0 && coins < coinCost) { alert('Moedas insuficientes!'); return; }
+  if (gemCost > 0 && gems < gemCost) { alert('Gemas insuficientes!'); return; }
+  coins -= coinCost;
+  gems -= gemCost;
+  gems += gemGain;
+  coins += coinGain;
+  document.getElementById('gems').textContent = gems;
+  document.getElementById('coins').textContent = coins;
+  alert('Pacote comprado!');
+}
+
+const brawlerImages = {
+  kevin: 'KEVIN-ABAZUKAS.png',
+  bruwly: 'BRUWL-ABAZUKAS.png',
+  warmin: 'WARMIN-ABAZUKAS.png'
+};
+
+function unlockBrawler(id, btn) {
+  brawlersBought++;
+  updateMissionProgress();
+
+  const card = document.getElementById('card-' + id);
+  const img = document.getElementById('img-' + id);
+  const status = document.getElementById('status-' + id);
+  if (card && img && status) {
+    card.classList.remove('locked');
+    img.src = brawlerImages[id];
+    status.textContent = 'Nível 1';
+    status.style.color = '#ffd700';
+  }
+  btn.textContent = 'Comprado';
+  btn.disabled = true;
+}
+
+let gameLoopId = null;
+
+function startGame() {
+  document.getElementById('lobby').classList.remove('active');
+  document.getElementById('game-canvas').classList.add('active');
+  document.getElementById('back-btn').style.display = 'none';
+  initGame(document.getElementById('game-canvas'));
+}
+
+function backToLobby() {
+  if (gameLoopId) {
+    cancelAnimationFrame(gameLoopId);
+    gameLoopId = null;
+  }
+  document.getElementById('game-canvas').classList.remove('active');
+  document.getElementById('back-btn').style.display = 'none';
+  document.getElementById('lobby').classList.add('active');
+}
+
+function initGame(canvas) {
+  const ctx = canvas.getContext('2d');
+  const WIDTH = 800, HEIGHT = 600;
+  const player = { x: WIDTH/2, y: HEIGHT/2, size: 22, speed: 3.5, color: '#4facfe', angle: 0 };
+  let bullets = [], enemies = [], score = 0, killsThisGame = 0, gameOver = false;
+  const keys = {};
+
+  function spawnEnemy() {
+    const side = Math.floor(Math.random() * 4);
+    let x, y;
+    if (side === 0) { x = Math.random()*WIDTH; y = -30; }
+    else if (side === 1) { x = WIDTH+30; y = Math.random()*HEIGHT; }
+    else if (side === 2) { x = Math.random()*WIDTH; y = HEIGHT+30; }
+    else { x = -30; y = Math.random()*HEIGHT; }
+    enemies.push({ x, y, size: 18+Math.random()*10, speed: 1.2+Math.random()*0.8, color: '#ff4757' });
+  }
+
+  document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+  document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    player.angle = Math.atan2(e.clientY - rect.top - player.y, e.clientX - rect.left - player.x);
+  });
+  canvas.addEventListener('click', () => {
+    if (gameOver) return;
+    bullets.push({ x: player.x, y: player.y, vx: Math.cos(player.angle)*8, vy: Math.sin(player.angle)*8, size: 6 });
+  });
+
+  function update() {
+    if (gameOver) return;
+    if (keys['w'] || keys['arrowup']) player.y -= player.speed;
+    if (keys['s'] || keys['arrowdown']) player.y += player.speed;
+    if (keys['a'] || keys['arrowleft']) player.x -= player.speed;
+    if (keys['d'] || keys['arrowright']) player.x += player.speed;
+    player.x = Math.max(player.size, Math.min(WIDTH - player.size, player.x));
+    player.y = Math.max(player.size, Math.min(HEIGHT - player.size, player.y));
+
+    bullets.forEach(b => { b.x += b.vx; b.y += b.vy; });
+    bullets = bullets.filter(b => b.x > 0 && b.x < WIDTH && b.y > 0 && b.y < HEIGHT);
+
+    if (Math.random() < 0.02) spawnEnemy();
+    enemies.forEach(e => {
+      const dx = player.x - e.x, dy = player.y - e.y, dist = Math.hypot(dx, dy) || 1;
+      e.x += (dx/dist)*e.speed; e.y += (dy/dist)*e.speed;
+      if (Math.hypot(e.x-player.x, e.y-player.y) < e.size + player.size) gameOver = true;
+    });
+
+    for (let bi = bullets.length - 1; bi >= 0; bi--) {
+      for (let ei = enemies.length - 1; ei >= 0; ei--) {
+        if (Math.hypot(bullets[bi].x - enemies[ei].x, bullets[bi].y - enemies[ei].y) < enemies[ei].size) {
+          enemies.splice(ei, 1);
+          bullets.splice(bi, 1);
+          score += 10;
+          killsThisGame++;
+          break;
+        }
+      }
+    }
+  }
+
+  function draw() {
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    enemies.forEach(e => {
+      ctx.fillStyle = e.color;
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.size, 0, Math.PI*2); ctx.fill();
+    });
+    ctx.fillStyle = '#ffdd44';
+    bullets.forEach(b => { ctx.beginPath(); ctx.arc(b.x, b.y, b.size, 0, Math.PI*2); ctx.fill(); });
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.rotate(player.angle);
+    ctx.fillStyle = player.color;
+    ctx.beginPath(); ctx.arc(0, 0, player.size, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.fillRect(player.size-4, -4, 16, 8);
+    ctx.restore();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 24px Arial';
+    ctx.fillText('Pontos: ' + score, 20, 40);
+
+    if (gameOver) {
+      const trophiesGained = Math.floor(score / 10) * 2;
+      trophies += trophiesGained;
+      document.getElementById('trophies').textContent = trophies;
+
+      totalKills += killsThisGame;
+      totalScore += score;
+      updateMissionProgress();
+
+      ctx.fillStyle = 'rgba(0,0,0,0.75)';
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      ctx.fillStyle = '#ff4757';
+      ctx.font = 'bold 48px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('GAME OVER', WIDTH/2, HEIGHT/2 - 50);
+      ctx.fillStyle = '#fff';
+      ctx.font = '24px Arial';
+      ctx.fillText('Pontuação: ' + score, WIDTH/2, HEIGHT/2);
+      ctx.fillText('+ ' + trophiesGained + ' Troféus', WIDTH/2, HEIGHT/2 + 40);
+
+      document.getElementById('back-btn').style.display = 'block';
+    }
+  }
+
+  function loop() {
+    update();
+    draw();
+    gameLoopId = requestAnimationFrame(loop);
+  }
+  loop();
+}
+</script>
+</body>
+</html>
